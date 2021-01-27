@@ -1,45 +1,38 @@
+import fs from "fs";
+import path from "path";
 import superagent from "superagent";
-import cheerio from "cheerio";
+import DellAnalyzer from "./dellAnalyzer";
 
-interface Course {
-  title: string;
-  count?: string; // 没有权限页面显示不出来count
+export interface Analyzer {
+  analyze: (html: string, filePath: string) => string;
 }
 class Crowller {
-  private url = "http://www.dell-lee.com/";
+  private filePath = path.resolve(__dirname, "../data/course.json");
 
-  constructor() {
-    this.getRawHtml();
+  constructor(private url: string, private analyzer: Analyzer) {
+    this.initSpiderProcess();
   }
 
-  getJsonInfo(html: string) {
-    const $ = cheerio.load(html);
-    const courseItems = $(".course-item");
-    const courseInfos: Course[] = [];
-
-    courseItems.map((index, item) => {
-      const descs = $(item).find(".course-desc");
-      const title = descs.eq(0).text();
-
-      courseInfos.push({
-        title,
-      });
-    });
-    // console.log(courseItems.length)
-
-    const result = {
-      time: new Date().getTime(),
-      data: courseInfos,
-    };
-
-    console.log(result);
-  }
-
-  async getRawHtml() {
+  private async getRawHtml() {
     const result = await superagent.get(this.url);
 
-    this.getJsonInfo(result.text);
+    return result.text;
+  }
+
+  private writeFile(content: string) {
+    fs.writeFileSync(this.filePath, content);
+  }
+
+  private async initSpiderProcess() {
+    const html = await this.getRawHtml();
+
+    const fileContent = this.analyzer.analyze(html, this.filePath);
+
+    this.writeFile(fileContent);
   }
 }
 
-const crowller = new Crowller();
+const url = "http://www.dell-lee.com/";
+
+const analyzer = DellAnalyzer.getInstance();
+const crowller = new Crowller(url, analyzer);
